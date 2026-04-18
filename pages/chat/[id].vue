@@ -78,6 +78,13 @@
         <p class="sent-hint">Appuyez sur n'importe quelle touche pour continuer</p>
       </div>
 
+      <!-- ══ STATE: TOO SHORT ══ -->
+      <div v-else-if="state === 'tooshort'" key="tooshort" class="screen screen-tooshort">
+        <div class="tooshort-icon">⏱</div>
+        <p class="tooshort-label">Trop court !</p>
+        <p class="tooshort-hint">Maintenez la touche au moins 2 secondes</p>
+      </div>
+
       <!-- ══ STATE: INCOMING ══ -->
       <div v-else-if="state === 'incoming'" key="incoming" class="screen screen-incoming">
         <div class="incoming-from">
@@ -126,6 +133,7 @@ const state           = ref('view')
 const lastSentText    = ref('')
 const incomingMessage = ref(null)
 let   keyDown         = false
+let   recordingStart  = 0
 
 // ── Navigation ──────────────────────────────────────────────────────
 const shiftContact = (dir) => {
@@ -160,6 +168,7 @@ const onKeyDown = async (e) => {
     // Any other key → start recording
     e.preventDefault()
     keyDown = true
+    recordingStart = Date.now()
     state.value = 'recording'
     reset()
     await startRecording()
@@ -175,7 +184,16 @@ const onKeyUp = async (e) => {
   if (!keyDown || state.value !== 'recording') return
   keyDown = false
 
+  const duration = Date.now() - recordingStart
+
   const blob = await stopRecording()
+
+  if (duration < 2000) {
+    reset()
+    state.value = 'tooshort'
+    setTimeout(() => { state.value = 'view' }, 1800)
+    return
+  }
 
   // Small grace period for speech recognition to finalize
   await new Promise(r => setTimeout(r, 350))
@@ -519,6 +537,29 @@ onUnmounted(() => {
   color: var(--text-dim);
   letter-spacing: 0.04em;
   margin-top: 16px;
+}
+
+/* ── TOO SHORT screen ── */
+.screen-tooshort {
+  gap: 20px;
+  animation: slide-up 0.25s ease;
+}
+
+.tooshort-icon {
+  font-size: 3.5rem;
+}
+
+.tooshort-label {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.tooshort-hint {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
 }
 
 /* ── INCOMING screen ── */
