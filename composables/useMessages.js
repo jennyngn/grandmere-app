@@ -1,6 +1,9 @@
+let subscribed = false
+let initialized = false
+
 export const useMessages = () => {
   const supabase = useSupabase()
-  const messages = ref([])
+  const messages = useState('ba_messages', () => [])
 
   const load = async () => {
     const { data } = await supabase
@@ -10,7 +13,6 @@ export const useMessages = () => {
     if (data) messages.value = data
   }
 
-  // Seed demo messages on first use
   const seedDemo = async () => {
     const { count } = await supabase
       .from('messages')
@@ -25,8 +27,9 @@ export const useMessages = () => {
     await load()
   }
 
-  // Realtime subscription
   const subscribe = () => {
+    if (subscribed) return
+    subscribed = true
     supabase
       .channel('messages-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async () => {
@@ -83,6 +86,7 @@ export const useMessages = () => {
       read: direction === 'sent'
     }
     await supabase.from('messages').insert([msg])
+    messages.value = [...messages.value, msg]
     return msg
   }
 
@@ -98,7 +102,8 @@ export const useMessages = () => {
     )
   }
 
-  if (process.client) {
+  if (process.client && !initialized) {
+    initialized = true
     load().then(() => seedDemo())
     subscribe()
   }
