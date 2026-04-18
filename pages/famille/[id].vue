@@ -49,6 +49,15 @@
           <div :class="['bubble', msg.direction === 'sent' ? 'bubble--grandma' : 'bubble--family']">
             <p class="bubble-text">{{ msg.text }}</p>
 
+            <!-- Accusé de lecture -->
+            <div v-if="msg.direction === 'received' && msg.read" class="read-receipt">
+              <svg viewBox="0 0 16 10" fill="none" width="16" height="10">
+                <path d="M1 5l3.5 3.5L14 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 5l3.5 3.5L14 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+              </svg>
+              Vu par Bà
+            </div>
+
             <!-- Translation -->
             <div v-if="translateOn && msg.direction === 'sent'" class="translation-row">
               <span class="translation-flag">🇫🇷</span>
@@ -386,6 +395,16 @@ watch(conversationMessages, () => scrollToBottom())
 
 .bubble--family .bubble-text {
   color: var(--bg);
+}
+
+.read-receipt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.04em;
+  align-self: flex-end;
 }
 
 .audio-row { display: flex; }

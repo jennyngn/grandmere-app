@@ -28,9 +28,94 @@
                 {{ unread[contact.id] }}
               </div>
             </button>
+
+            <!-- Bouton nouveau profil -->
+            <button class="profile-card profile-card--new" @click="step = 'create'">
+              <div class="profile-avatar profile-avatar--new">+</div>
+              <div class="profile-name">Nouveau</div>
+            </button>
           </div>
 
           <p class="demo-hint">Démo : chaque profil a un code à 4 chiffres répétés (1111, 2222…)</p>
+        </div>
+
+        <!-- ── Créer un profil ── -->
+        <div v-else-if="step === 'create'" key="create" class="step-create">
+          <button class="back-btn" @click="resetCreate">← Retour</button>
+
+          <h2 class="create-title">Nouveau profil</h2>
+
+          <template v-if="createStep === 'name'">
+            <p class="pin-label">Entrez votre prénom</p>
+            <input
+              v-model="newName"
+              class="name-input"
+              type="text"
+              placeholder="Prénom"
+              maxlength="20"
+              @keydown.enter="submitName"
+              autofocus
+            />
+            <button
+              class="confirm-btn"
+              :disabled="!newName.trim()"
+              @click="submitName"
+            >Continuer →</button>
+          </template>
+
+          <template v-else-if="createStep === 'pin'">
+            <div class="pin-profile">
+              <div class="profile-avatar" :style="{ background: newColor, width: '80px', height: '80px', fontSize: '1.6rem' }">
+                {{ newInitials }}
+              </div>
+              <div class="pin-name">{{ newName.trim().toUpperCase() }}</div>
+            </div>
+            <p class="pin-label">Choisissez votre code à 4 chiffres</p>
+            <div class="pin-dots" :class="{ 'pin-dots--error': pinError }">
+              <span v-for="i in 4" :key="i" :class="['dot', { 'dot--filled': newPin.length >= i }]"
+                :style="newPin.length >= i ? { background: newColor } : {}" />
+            </div>
+            <p v-if="pinError" class="pin-error">Codes différents, réessayez</p>
+            <div class="numpad">
+              <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" class="num-btn" @click="addCreateDigit(n)">{{ n }}</button>
+              <button class="num-btn num-btn--action" @click="newPin = newPin.slice(0,-1)">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                  <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <line x1="18" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <line x1="12" y1="9" x2="18" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="num-btn" @click="addCreateDigit(0)">0</button>
+              <button class="num-btn num-btn--action" @click="resetCreate">✕</button>
+            </div>
+          </template>
+
+          <template v-else-if="createStep === 'confirm'">
+            <div class="pin-profile">
+              <div class="profile-avatar" :style="{ background: newColor, width: '80px', height: '80px', fontSize: '1.6rem' }">
+                {{ newInitials }}
+              </div>
+              <div class="pin-name">{{ newName.trim().toUpperCase() }}</div>
+            </div>
+            <p class="pin-label">Confirmez votre code</p>
+            <div class="pin-dots" :class="{ 'pin-dots--error': pinError }">
+              <span v-for="i in 4" :key="i" :class="['dot', { 'dot--filled': confirmPin.length >= i }]"
+                :style="confirmPin.length >= i ? { background: newColor } : {}" />
+            </div>
+            <p v-if="pinError" class="pin-error">Codes différents, réessayez</p>
+            <div class="numpad">
+              <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" class="num-btn" @click="addConfirmDigit(n)">{{ n }}</button>
+              <button class="num-btn num-btn--action" @click="confirmPin = confirmPin.slice(0,-1)">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                  <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <line x1="18" y1="9" x2="12" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <line x1="12" y1="9" x2="18" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="num-btn" @click="addConfirmDigit(0)">0</button>
+              <button class="num-btn num-btn--action" @click="createStep = 'pin'; confirmPin = ''">✕</button>
+            </div>
+          </template>
         </div>
 
         <!-- ── Saisie du code PIN ── -->
@@ -90,11 +175,14 @@ import { useAuth }     from '~/composables/useAuth'
 
 definePageMeta({ ssr: false })
 
+const COLORS = ['#4a6e9a','#8a4e7a','#4a8a5e','#9a7a4a','#7a4a8a','#4a7a8a','#8a6a4a','#6a4a9a']
+
 const router = useRouter()
-const { contacts, getContact } = useContacts()
+const { contacts, addContact } = useContacts()
 const { getUnreadCount }       = useMessages()
 const { login, isAuthorized }  = useAuth()
 
+// ── Login flow ──
 const step            = ref('pick')
 const selectedContact = ref(null)
 const pin             = ref('')
@@ -104,7 +192,6 @@ const unread = computed(() =>
   Object.fromEntries(contacts.value.map(c => [c.id, getUnreadCount(c.id).value]))
 )
 
-// Si déjà connecté, rediriger directement
 onMounted(() => {
   contacts.value.forEach(c => {
     if (isAuthorized(c.id)) router.replace(`/famille/${c.id}`)
@@ -142,10 +229,56 @@ const checkPin = () => {
     router.push(`/famille/${selectedContact.value.id}`)
   } else {
     pinError.value = true
-    setTimeout(() => {
-      pin.value = ''
-      pinError.value = false
-    }, 800)
+    setTimeout(() => { pin.value = ''; pinError.value = false }, 800)
+  }
+}
+
+// ── Create flow ──
+const createStep = ref('name')
+const newName    = ref('')
+const newPin     = ref('')
+const confirmPin = ref('')
+
+const newInitials = computed(() => {
+  const words = newName.value.trim().split(/\s+/)
+  return words.length >= 2
+    ? (words[0][0] + words[1][0]).toUpperCase()
+    : newName.value.slice(0, 2).toUpperCase()
+})
+const newColor = computed(() => COLORS[contacts.value.length % COLORS.length])
+
+const resetCreate = () => {
+  step.value = 'pick'
+  createStep.value = 'name'
+  newName.value = ''
+  newPin.value = ''
+  confirmPin.value = ''
+  pinError.value = false
+}
+
+const submitName = () => {
+  if (!newName.value.trim()) return
+  createStep.value = 'pin'
+}
+
+const addCreateDigit = (digit) => {
+  if (newPin.value.length >= 4) return
+  newPin.value += digit
+  if (newPin.value.length === 4) createStep.value = 'confirm'
+}
+
+const addConfirmDigit = async (digit) => {
+  if (confirmPin.value.length >= 4) return
+  confirmPin.value += digit
+  if (confirmPin.value.length === 4) {
+    if (confirmPin.value === newPin.value) {
+      const contact = await addContact(newName.value.trim(), newPin.value)
+      login(contact.id)
+      router.push(`/famille/${contact.id}`)
+    } else {
+      pinError.value = true
+      setTimeout(() => { confirmPin.value = ''; pinError.value = false }, 800)
+    }
   }
 }
 </script>
@@ -156,6 +289,7 @@ const checkPin = () => {
   background: var(--bg);
   display: flex;
   flex-direction: column;
+  cursor: auto;
 }
 
 /* ── Header ── */
@@ -422,4 +556,72 @@ const checkPin = () => {
   font-size: 1rem;
   color: var(--text-secondary);
 }
+
+/* ── Nouveau profil card ── */
+.profile-card--new {
+  border-style: dashed;
+  opacity: 0.65;
+}
+.profile-card--new:hover { opacity: 1; }
+
+.profile-avatar--new {
+  background: var(--bg-surface) !important;
+  border: 2px dashed var(--text-dim);
+  color: var(--text-dim);
+  font-size: 1.8rem;
+  font-weight: 300;
+}
+
+/* ── Create step ── */
+.step-create {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 340px;
+  position: relative;
+}
+
+.create-title {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.name-input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 20px;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  text-align: center;
+  letter-spacing: 0.08em;
+  outline: none;
+  transition: border-color 0.2s;
+  text-transform: uppercase;
+}
+.name-input::placeholder { color: var(--text-dim); text-transform: none; }
+.name-input:focus { border-color: var(--accent); }
+
+.confirm-btn {
+  padding: 14px 32px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.04em;
+}
+.confirm-btn:hover { background: var(--accent-hover); }
+.confirm-btn:disabled { opacity: 0.4; cursor: default; }
 </style>
